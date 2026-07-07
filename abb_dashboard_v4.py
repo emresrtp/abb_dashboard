@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import json, os, math, requests
-
+import google.generativeai as genai
 ABB_LOGO_B64 = "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9IiNmZjAwMGYiIHZpZXdCb3g9Ii0xIC0xIDg4LjIgMzUiPgogIDxwYXRoIGQ9Ik00NyAzM2gyYzYtLjMgMTAuMi01IDEwLjItMTAuNiAwLTEuOS0uNC0zLjgtMS4zLTUuM0g0N1YzM3oiPjwvcGF0aD4KICA8cmVjdCB3aWR0aD0iMTAiIGhlaWdodD0iMTYiIHg9IjM2IiB5PSIxNyI+PC9yZWN0PgogIDxwYXRoIGQ9Ik01Ny4zIDE2Yy0xLTEuNC0yLjQtMi41LTMuOS0zLjMgMS44LTEuMyAzLTMuNCAzLTUuNyAwLTMuOS0zLjEtNy03LTdINDd2MTZoMTAuM3oiPjwvcGF0aD4KICA8cmVjdCB3aWR0aD0iMTAiIGhlaWdodD0iMTYiIHg9IjM2Ij48L3JlY3Q+CiAgPHBhdGggZD0iTTc0IDMzaDJjNi0uMyAxMC4yLTUgMTAuMi0xMC42IDAtMS45LS40LTMuOC0xLjMtNS4zSDc0VjMzeiI+PC9wYXRoPgogIDxyZWN0IHdpZHRoPSIxMCIgaGVpZ2h0PSIxNiIgeD0iNjMiIHk9IjE3Ij48L3JlY3Q+CiAgPHBhdGggZD0iTTg0LjMgMTZjLTEtMS40LTIuNC0yLjUtMy45LTMuMyAxLjgtMS4zIDMtMy40IDMtNS43IDAtMy45LTMuMS03LTctN0g3NHYxNmgxMC4zeiI+PC9wYXRoPgogIDxyZWN0IHdpZHRoPSIxMCIgaGVpZ2h0PSIxNiIgeD0iNjMiPjwvcmVjdD4KICA8cG9seWdvbiBwb2ludHM9IjUuNywxNyAwLDMzIDguMywzMyAxMC43LDI2IDE2LDI2IDE2LDE3Ij48L3BvbHlnb24+CiAgPHBvbHlnb24gcG9pbnRzPSIxNiwwIDExLjcsMCA2LDE2IDE2LDE2Ij48L3BvbHlnb24+CiAgPHBvbHlnb24gcG9pbnRzPSIxNywyNiAyMi4zLDI2IDI0LjcsMzMgMzMsMzMgMjcuMywxNyAxNywxNyI+PC9wb2x5Z29uPgogIDxwb2x5Z29uIHBvaW50cz0iMjcsMTYgMjEuMywwIDE3LDAgMTcsMTYiPjwvcG9seWdvbj4KPC9zdmc+Cg=="
 
 # ── PAGE CONFIG ──────────────────────────────────────────────────────────────
@@ -193,19 +193,48 @@ def save_data(df):
     df.to_excel(DATA_FILE, index=False)
 
 # ── AI SUMMARY ───────────────────────────────────────────────────────────────
+@st.cache_data(show_spinner=False, ttl=3600)
+def ai_summary_gemini(firma, sektor, il, ilce, products, website):
+    loc = f"{ilce} / {il}" if ilce else il
+    prompt = f"""Türkçe, kısa ve net yanıt ver. Markdown kullanma.
+
+Firma: {firma}
+Sektör: {sektor}
+Konum: {loc}
+Ürünler/Hizmetler: {products if products else "Bilgi yok"}
+Website: {website if website else "Yok"}
+
+Şu 3 başlıkta kısaca yaz (her biri 1-2 cümle):
+1. Genel Üretim: Bu firma ne üretir / ne iş yapar?
+2. Şirket Büyüklüğü: Tahmini ölçeği nedir? (KOBİ / orta / büyük)
+3. ABB Fırsatı: ABB hangi ürün/çözümü önerebilir?"""
+    try:
+        response = gemini_model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        return f"Hata: {str(e)}"
+
 def ai_summary(row):
-    firma = row["FİRMA"]; sektor = row["Sektör"]
-    il = row["İl"]; ilce = row["İlçe"]; products = row["Extracted_Products"]
+    firma    = str(row["FİRMA"])
+    sektor   = str(row["Sektör"])
+    il       = str(row["İl"])
+    ilce     = str(row["İlçe"])
+    products = str(row["Extracted_Products"])
+    website  = str(row["Website"])
+
+    if GEMINI_OK:
+        return ai_summary_gemini(firma, sektor, il, ilce, products, website)
+
+    # Fallback: template
     loc = f"{ilce} / {il}" if ilce else il
     lines = [f"<b>{firma}</b>, {loc} bölgesinde faaliyet gösteren bir <b>{sektor}</b> firmasıdır.<br><br>"]
-    if products:
-        items = [p.strip() for p in str(products).split(",")[:5]]
+    if products and products != "nan":
+        items = [p.strip() for p in products.split(",")[:5]]
         lines.append(f"<b>🏭 Öne Çıkan Ürünler:</b> {', '.join(items)}" +
-                     ("..." if len(str(products).split(",")) > 5 else "") + "<br><br>")
+                     ("..." if len(products.split(",")) > 5 else "") + "<br><br>")
     lines.append(
-        f"<b>💡 ABB için Potansiyel:</b> {sektor} sektöründe faaliyet gösteren bu firma, "
-        f"ABB'nin endüstriyel otomasyon, motor sürücü ve enerji çözümleri portföyü ile "
-        f"örtüşen iş birliği fırsatları sunabilir.")
+        f"<b>💡 ABB Fırsatı:</b> {sektor} sektöründe faaliyet gösteren bu firma, "
+        f"ABB'nin endüstriyel otomasyon ve enerji çözümleriyle örtüşen fırsatlar sunabilir.")
     return "".join(lines)
 
 # ── HARİTA FONKSİYONU ─────────────────────────────────────────────────────────
@@ -331,7 +360,14 @@ def make_turkey_map(city_counts_df, geojson=None, selected_cities=None):
                 showlegend=False,
             ))
     return fig
-
+# ── GEMİNİ INIT ──────────────────────────────────────────────────────────────
+try:
+    GEMINI_API_KEY = st.secrets["AQ.Ab8RN6JHmi35fyHCGEwNM8D0MVc0Mhi7gBQrvRI0oEeoWjXflw"]
+    genai.configure(api_key=GEMINI_API_KEY)
+    gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+    GEMINI_OK = True
+except Exception:
+    GEMINI_OK = False
 # ── SESSION INIT ─────────────────────────────────────────────────────────────
 if "df_data"   not in st.session_state: st.session_state.df_data   = load_data_raw()
 if "notes"     not in st.session_state: st.session_state.notes     = load_notes()
@@ -619,11 +655,24 @@ if sel != "— Firma seçin —":
             st.session_state.ai_open[ai_key] = not st.session_state.ai_open.get(ai_key, False)
             st.rerun()
 
-    if st.session_state.ai_open.get(ai_key):
-        st.markdown(
-            f'<div class="ai-box"><b style="color:#6764f6;font-size:.72rem;letter-spacing:1px;">'
-            f'🤖 AI ÖZET</b><br><br>{ai_summary(row_series)}</div>',
-            unsafe_allow_html=True)
+   if st.session_state.ai_open.get(ai_key):
+    with st.spinner("🤖 Gemini analiz ediyor..."):
+        summary_text = ai_summary(row_series)
+    summary_html = summary_text.replace("\n", "<br>")
+    badge = (
+        '<span style="background:#6764f6;color:#fff;font-size:.68rem;padding:2px 8px;'
+        'border-radius:20px;font-weight:700;margin-right:6px;">✨ Gemini</span>'
+        if GEMINI_OK else
+        '<span style="background:#aaa;color:#fff;font-size:.68rem;padding:2px 8px;'
+        'border-radius:20px;font-weight:700;margin-right:6px;">Template</span>'
+    )
+    st.markdown(
+        f'<div class="ai-box">'
+        f'<div style="margin-bottom:8px;">{badge}'
+        f'<b style="color:#6764f6;font-size:.72rem;letter-spacing:1px;">AI ÖZET</b></div>'
+        f'{summary_html}</div>',
+        unsafe_allow_html=True)
+
 
     st.markdown("<br>", unsafe_allow_html=True)
 
