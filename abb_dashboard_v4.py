@@ -376,7 +376,7 @@ def make_turkey_map(city_counts_df, geojson=None, selected_cities=None):
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel("gemini-1.5-flash-8b")
+    gemini_model = genai.GenerativeModel("gemini-2.0-flash")
     GEMINI_OK = True
 except Exception:
     GEMINI_OK = False
