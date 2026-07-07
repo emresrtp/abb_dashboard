@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import json, os, math, requests
 import google.generativeai as genai
+
 ABB_LOGO_B64 = "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGZpbGw9IiNmZjAwMGYiIHZpZXdCb3g9Ii0xIC0xIDg4LjIgMzUiPgogIDxwYXRoIGQ9Ik00NyAzM2gyYzYtLjMgMTAuMi01IDEwLjItMTAuNiAwLTEuOS0uNC0zLjgtMS4zLTUuM0g0N1YzM3oiPjwvcGF0aD4KICA8cmVjdCB3aWR0aD0iMTAiIGhlaWdodD0iMTYiIHg9IjM2IiB5PSIxNyI+PC9yZWN0PgogIDxwYXRoIGQ9Ik01Ny4zIDE2Yy0xLTEuNC0yLjQtMi41LTMuOS0zLjMgMS44LTEuMyAzLTMuNCAzLTUuNyAwLTMuOS0zLjEtNy03LTdINDd2MTZoMTAuM3oiPjwvcGF0aD4KICA8cmVjdCB3aWR0aD0iMTAiIGhlaWdodD0iMTYiIHg9IjM2Ij48L3JlY3Q+CiAgPHBhdGggZD0iTTc0IDMzaDJjNi0uMyAxMC4yLTUgMTAuMi0xMC42IDAtMS45LS40LTMuOC0xLjMtNS4zSDc0VjMzeiI+PC9wYXRoPgogIDxyZWN0IHdpZHRoPSIxMCIgaGVpZ2h0PSIxNiIgeD0iNjMiIHk9IjE3Ij48L3JlY3Q+CiAgPHBhdGggZD0iTTg0LjMgMTZjLTEtMS40LTIuNC0yLjUtMy45LTMuMyAxLjgtMS4zIDMtMy40IDMtNS43IDAtMy45LTMuMS03LTctN0g3NHYxNmgxMC4zeiI+PC9wYXRoPgogIDxyZWN0IHdpZHRoPSIxMCIgaGVpZ2h0PSIxNiIgeD0iNjMiPjwvcmVjdD4KICA8cG9seWdvbiBwb2ludHM9IjUuNywxNyAwLDMzIDguMywzMyAxMC43LDI2IDE2LDI2IDE2LDE3Ij48L3BvbHlnb24+CiAgPHBvbHlnb24gcG9pbnRzPSIxNiwwIDExLjcsMCA2LDE2IDE2LDE2Ij48L3BvbHlnb24+CiAgPHBvbHlnb24gcG9pbnRzPSIxNywyNiAyMi4zLDI2IDI0LjcsMzMgMzMsMzMgMjcuMywxNyAxNywxNyI+PC9wb2x5Z29uPgogIDxwb2x5Z29uIHBvaW50cz0iMjcsMTYgMjEuMywwIDE3LDAgMTcsMTYiPjwvcG9seWdvbj4KPC9zdmc+Cg=="
 
 # ── PAGE CONFIG ──────────────────────────────────────────────────────────────
@@ -17,7 +18,7 @@ st.set_page_config(
 # ── CSS ──────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-html, body, [class*="css"] { font-family: 'ABBvoice', Arial, sans-serif !important; }
+html, body, [class*="css"] { font-family: 'Segoe UI', Arial, sans-serif !important; }
 .stApp { background-color: #f4f6f9; }
 .topbar {
     background: #1a1a2e; color: #fff;
@@ -195,6 +196,7 @@ def save_data(df):
 # ── AI SUMMARY ───────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False, ttl=3600)
 def ai_summary_gemini(firma, sektor, il, ilce, products, website):
+    """Gemini API ile firma özeti — sonuçlar cache'lenir"""
     loc = f"{ilce} / {il}" if ilce else il
     prompt = f"""Türkçe, kısa ve net yanıt ver. Markdown kullanma.
 
@@ -215,6 +217,7 @@ Website: {website if website else "Yok"}
         return f"Hata: {str(e)}"
 
 def ai_summary(row):
+    """Gemini varsa Gemini, yoksa template özet"""
     firma    = str(row["FİRMA"])
     sektor   = str(row["Sektör"])
     il       = str(row["İl"])
@@ -335,7 +338,7 @@ def make_turkey_map(city_counts_df, geojson=None, selected_cities=None):
         paper_bgcolor="#f4f6f9",
         height=480,
         clickmode="event+select",
-        font=dict(family="ABBvoice, sans-serif"),
+        font=dict(family="Segoe UI, Arial"),
         coloraxis_colorbar=dict(title="Firma Sayısı"),
     )
     # Seçili iller (map click + sidebar) farklı renkte vurgula
@@ -349,7 +352,7 @@ def make_turkey_map(city_counts_df, geojson=None, selected_cities=None):
                 customdata=[v[0] for v in valid],
                 mode="markers+text",
                 textposition="bottom center",
-                textfont=dict(size=10, color="#6764f6", family="ABBvoice"),
+                textfont=dict(size=10, color="#6764f6", family="Arial Black"),
                 marker=dict(
                     size=22, color="rgba(103,100,246,0.25)",
                     line=dict(color="#6764f6", width=2.5),
@@ -360,14 +363,16 @@ def make_turkey_map(city_counts_df, geojson=None, selected_cities=None):
                 showlegend=False,
             ))
     return fig
+
 # ── GEMİNİ INIT ──────────────────────────────────────────────────────────────
 try:
-    GEMINI_API_KEY = st.secrets["AQ.Ab8RN6JHmi35fyHCGEwNM8D0MVc0Mhi7gBQrvRI0oEeoWjXflw"]
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=GEMINI_API_KEY)
     gemini_model = genai.GenerativeModel("gemini-2.0-flash")
     GEMINI_OK = True
 except Exception:
     GEMINI_OK = False
+
 # ── SESSION INIT ─────────────────────────────────────────────────────────────
 if "df_data"   not in st.session_state: st.session_state.df_data   = load_data_raw()
 if "notes"     not in st.session_state: st.session_state.notes     = load_notes()
@@ -655,24 +660,11 @@ if sel != "— Firma seçin —":
             st.session_state.ai_open[ai_key] = not st.session_state.ai_open.get(ai_key, False)
             st.rerun()
 
-   if st.session_state.ai_open.get(ai_key):
-    with st.spinner("🤖 Gemini analiz ediyor..."):
-        summary_text = ai_summary(row_series)
-    summary_html = summary_text.replace("\n", "<br>")
-    badge = (
-        '<span style="background:#6764f6;color:#fff;font-size:.68rem;padding:2px 8px;'
-        'border-radius:20px;font-weight:700;margin-right:6px;">✨ Gemini</span>'
-        if GEMINI_OK else
-        '<span style="background:#aaa;color:#fff;font-size:.68rem;padding:2px 8px;'
-        'border-radius:20px;font-weight:700;margin-right:6px;">Template</span>'
-    )
-    st.markdown(
-        f'<div class="ai-box">'
-        f'<div style="margin-bottom:8px;">{badge}'
-        f'<b style="color:#6764f6;font-size:.72rem;letter-spacing:1px;">AI ÖZET</b></div>'
-        f'{summary_html}</div>',
-        unsafe_allow_html=True)
-
+    if st.session_state.ai_open.get(ai_key):
+        st.markdown(
+            f'<div class="ai-box"><b style="color:#6764f6;font-size:.72rem;letter-spacing:1px;">'
+            f'🤖 AI ÖZET</b><br><br>{ai_summary(row_series)}</div>',
+            unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -780,5 +772,5 @@ st.markdown(f"""
 <div style="text-align:center;color:#aaa;font-size:.75rem;padding:10px 0;
             display:flex;align-items:center;justify-content:center;gap:10px;">
     <img src="data:image/svg+xml;base64,{ABB_LOGO_B64}" style="height:22px;border-radius:2px;opacity:.7;">
-    <span>Gıda &amp; İçecek Firma Veritabanı &nbsp;·&nbsp; Türkiye Pazar Analizi &nbsp;·&nbsp; © 2026 ABB </span>
+    <span>Gıda &amp; İçecek Firma Veritabanı &nbsp;·&nbsp; Türkiye Pazar Analizi &nbsp;·&nbsp; © 2024 ABB Ltd.</span>
 </div>""", unsafe_allow_html=True)
