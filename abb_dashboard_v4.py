@@ -194,7 +194,7 @@ def save_data(df):
     df.to_excel(DATA_FILE, index=False)
 
 # ── AI SUMMARY ───────────────────────────────────────────────────────────────
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False, ttl=86400)
 def ai_summary_gemini(firma, sektor, il, ilce, products, website):
     """Gemini API ile firma özeti — sonuçlar cache'lenir"""
     loc = f"{ilce} / {il}" if ilce else il
@@ -210,10 +210,18 @@ Website: {website if website else "Yok"}
 1. Genel Üretim: Bu firma ne üretir / ne iş yapar?
 2. Şirket Büyüklüğü: Tahmini ölçeği nedir? (KOBİ / orta / büyük)
 3. ABB Fırsatı: ABB hangi ürün/çözümü önerebilir?"""
+    import time
     try:
         response = gemini_model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
+        if "quota" in str(e).lower() or "429" in str(e):
+            time.sleep(5)
+            try:
+                response = gemini_model.generate_content(prompt)
+                return response.text.strip()
+            except:
+                return "⚠️ API limiti doldu. Lütfen biraz bekleyip tekrar deneyin."
         return f"Hata: {str(e)}"
 
 def ai_summary(row):
@@ -368,7 +376,7 @@ def make_turkey_map(city_counts_df, geojson=None, selected_cities=None):
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+    gemini_model = genai.GenerativeModel("gemini-1.5-flash-8b")
     GEMINI_OK = True
 except Exception:
     GEMINI_OK = False
